@@ -1,7 +1,7 @@
 package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.RenderProperties;
-import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.vk.VkBuffer;
 import me.cortex.voxy.client.core.rendering.util.DepthFramebuffer;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
@@ -124,5 +124,5 @@ public abstract class Viewport <A extends Viewport<A>> {
         return (A) this;
     }
 
-    public abstract GlBuffer getRenderList();
+    public abstract VkBuffer getRenderList();
 }

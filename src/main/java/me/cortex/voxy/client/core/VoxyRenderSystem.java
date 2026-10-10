@@ -96,15 +96,9 @@ public class VoxyRenderSystem {
         }
 
         //Fking HATE EVERYTHING AAAAAAAAAAAAAAAA
-        int[] oldBufferBindings = new int[10];
-        for (int i = 0; i < oldBufferBindings.length; i++) {
-            oldBufferBindings[i] = glGetIntegeri(GL_SHADER_STORAGE_BUFFER_BINDING, i);
-        }
-
         try {
-            //wait for opengl to be finished, this should hopefully ensure all memory allocations are free
-            glFinish();
-            glFinish();
+            // VK Init Placeholder
+            System.out.println("VK Init Placeholder");
 
             this.worldIn = world;
 
@@ -173,10 +167,6 @@ public class VoxyRenderSystem {
         } catch (RuntimeException e) {
             world.releaseRef();//If something goes wrong, we must release the world first
             throw e;
-        }
-
-        for (int i = 0; i < oldBufferBindings.length; i++) {
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, oldBufferBindings[i]);
         }
 
         for (int i = 0; i < 12; i++) {
@@ -269,15 +259,10 @@ public class VoxyRenderSystem {
         TimingStatistics.main.start();
 
         //TODO: optimize
-        int[] oldBufferBindings = new int[10];
-        for (int i = 0; i < oldBufferBindings.length; i++) {
-            oldBufferBindings[i] = glGetIntegeri(GL_SHADER_STORAGE_BUFFER_BINDING, i);
-        }
-
-        GlStateManager._enableDepthTest();
-        GlStateManager._depthFunc(this.properties.closerEqualDepthCompare());
-        GlStateManager._depthMask(true);
-        GlStateManager._disablePolygonOffset();
+        // VK Dynamic Rendering Placeholder
+        // vkCmdSetDepthTestEnable(cmd, true)
+        // vkCmdSetDepthCompareOp(cmd, VK_COMPARE_OP_...)
+        // vkCmdSetDepthWriteEnable(cmd, true)
 
         int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
 
@@ -368,10 +353,6 @@ public class VoxyRenderSystem {
             IrisUtil.clearIrisSamplers();//Thanks iris (sigh)
 
             //TODO: should/needto actually restore all of these, not just clear them
-            //Clear all the bindings
-            for (int i = 0; i < oldBufferBindings.length; i++) {
-                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, oldBufferBindings[i]);
-            }
             GlStateManager._blendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
             glBlendEquation(GL_FUNC_ADD);
             GlStateManager._blendFuncSeparate(0,0, 0, 0);

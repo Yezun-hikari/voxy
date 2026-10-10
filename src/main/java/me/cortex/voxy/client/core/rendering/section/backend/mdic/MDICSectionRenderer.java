@@ -186,28 +186,26 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         //RenderLayer.getCutoutMipped().startDrawing();
 
 
-        glDisable(GL_CULL_FACE);
-        glDisable(GL_BLEND);
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(this.properties.closerEqualDepthCompare());
+        // VK Dynamic Rendering Placeholder
+        // vkCmdSetDepthTestEnable(cmd, true)
+
         this.terrainShader.bind();
-        glBindVertexArray(GlVertexArray.STATIC_VAO);//Needs to be before binding
         this.pipeline.setupAndBindOpaque(viewport);
-        this.bindRenderingBuffers(viewport);
+        // this.bindRenderingBuffers(viewport);
 
-        glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);//Barrier everything is needed
-        glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
+        // VK Pipeline Barrier Placeholder
 
         if (VoxyClient.getOcclusionDebugState()==3) {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        }
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCountOffset, maxDrawCount, 0);
-        if (VoxyClient.getOcclusionDebugState()==3) {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            // vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_LINE)
         }
 
-        glEnable(GL_CULL_FACE);
-        glBindVertexArray(0);
+        if (viewport.commandBuffer != null) {
+            org.lwjgl.vulkan.VK10.vkCmdDrawIndexed(viewport.commandBuffer, maxDrawCount, 1, 0, 0, 0); // Placeholder arguments
+        }
+
+        if (VoxyClient.getOcclusionDebugState()==3) {
+            // vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_FILL)
+        }
         glBindSampler(0, 0);
         glBindTextureUnit(0, 0);
         glBindSampler(1, 0);
@@ -264,12 +262,13 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         {//Dispatch prep
             this.prepShader.bind();
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCountCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.getRenderList().id);
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-            glDispatchCompute(1,1,1);
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+            // VK Descriptor Binding Placeholder
+
+            // VK Pipeline Barrier Placeholder
+            if (viewport.commandBuffer != null) {
+                org.lwjgl.vulkan.VK10.vkCmdDispatch(viewport.commandBuffer, 1, 1, 1);
+            }
+            // VK Pipeline Barrier Placeholder
         }
 
         GPUTiming.INSTANCE.marker("OT");
