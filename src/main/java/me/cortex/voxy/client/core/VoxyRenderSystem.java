@@ -98,7 +98,7 @@ public class VoxyRenderSystem {
         //Fking HATE EVERYTHING AAAAAAAAAAAAAAAA
         try {
             // VK Init Placeholder
-            System.out.println("VK Init Placeholder");
+            me.cortex.voxy.client.core.vk.VoxyVulkanContext.init();
 
             this.worldIn = world;
 
@@ -260,9 +260,25 @@ public class VoxyRenderSystem {
 
         //TODO: optimize
         // VK Dynamic Rendering Placeholder
-        // vkCmdSetDepthTestEnable(cmd, true)
-        // vkCmdSetDepthCompareOp(cmd, VK_COMPARE_OP_...)
-        // vkCmdSetDepthWriteEnable(cmd, true)
+        if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN) {
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                org.lwjgl.vulkan.VkRenderingAttachmentInfo colorAttachment = org.lwjgl.vulkan.VkRenderingAttachmentInfo.calloc(stack)
+                    .sType(org.lwjgl.vulkan.VK13.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO)
+                    .imageView(1) // Placeholder view
+                    .imageLayout(org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                    .loadOp(org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_LOAD)
+                    .storeOp(org.lwjgl.vulkan.VK10.VK_ATTACHMENT_STORE_OP_STORE);
+
+                org.lwjgl.vulkan.VkRenderingInfo renderingInfo = org.lwjgl.vulkan.VkRenderingInfo.calloc(stack)
+                    .sType(org.lwjgl.vulkan.VK13.VK_STRUCTURE_TYPE_RENDERING_INFO)
+                    .renderArea(it -> it.offset(o -> o.x(0).y(0)).extent(e -> e.width(viewport.width).height(viewport.height)))
+                    .layerCount(1)
+                    .colorAttachments(org.lwjgl.vulkan.VkRenderingAttachmentInfo.calloc(1, stack).put(0, colorAttachment));
+
+                // viewport.commandBuffer should be used here
+                // org.lwjgl.vulkan.VK13.vkCmdBeginRendering(viewport.commandBuffer, renderingInfo);
+            }
+        }
 
         int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
 

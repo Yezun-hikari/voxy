@@ -3,7 +3,8 @@ package me.cortex.voxy.client.core.vk;
 import me.cortex.voxy.common.util.TrackedObject;
 
 public class VkTexture extends TrackedObject {
-    public final long id;
+    public long id;
+    public long memoryId;
     private final int type;
     private int format;
     private int width;
@@ -20,14 +21,11 @@ public class VkTexture extends TrackedObject {
 
     public VkTexture(int type) {
         this.type = type;
-        // Placeholder for vkCreateImage
-        this.id = 1;
         COUNT++;
     }
 
     private VkTexture(int type, boolean useGenTypes) {
         this.type = type;
-        this.id = 1;
         COUNT++;
     }
 
@@ -41,6 +39,49 @@ public class VkTexture extends TrackedObject {
         this.height = height;
         this.levels = levels;
         ESTIMATED_TOTAL_SIZE += this.getEstimatedSize();
+
+        if (VoxyVulkanContext.MOCK_VULKAN) {
+            this.id = 1; // Dummy ID
+        } else {
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                org.lwjgl.vulkan.VkDevice device = VoxyVulkanContext.getInstance().getDevice();
+
+                org.lwjgl.vulkan.VkImageCreateInfo imageInfo = org.lwjgl.vulkan.VkImageCreateInfo.calloc(stack)
+                    .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO)
+                    .imageType(this.type)
+                    .extent(it -> it.width(this.width).height(this.height).depth(1))
+                    .mipLevels(this.levels)
+                    .arrayLayers(1)
+                    .format(this.format)
+                    .tiling(org.lwjgl.vulkan.VK10.VK_IMAGE_TILING_OPTIMAL)
+                    .initialLayout(org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_UNDEFINED)
+                    .usage(org.lwjgl.vulkan.VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT | org.lwjgl.vulkan.VK10.VK_IMAGE_USAGE_SAMPLED_BIT)
+                    .samples(org.lwjgl.vulkan.VK10.VK_SAMPLE_COUNT_1_BIT)
+                    .sharingMode(org.lwjgl.vulkan.VK10.VK_SHARING_MODE_EXCLUSIVE);
+
+                java.nio.LongBuffer pImage = stack.mallocLong(1);
+                if (org.lwjgl.vulkan.VK10.vkCreateImage(device, imageInfo, null, pImage) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
+                    throw new RuntimeException("Failed to create image");
+                }
+                this.id = pImage.get(0);
+
+                org.lwjgl.vulkan.VkMemoryRequirements memRequirements = org.lwjgl.vulkan.VkMemoryRequirements.calloc(stack);
+                org.lwjgl.vulkan.VK10.vkGetImageMemoryRequirements(device, this.id, memRequirements);
+
+                org.lwjgl.vulkan.VkMemoryAllocateInfo allocInfo = org.lwjgl.vulkan.VkMemoryAllocateInfo.calloc(stack)
+                    .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
+                    .allocationSize(memRequirements.size())
+                    .memoryTypeIndex(0); // Placeholder for proper memory type lookup
+
+                java.nio.LongBuffer pMemory = stack.mallocLong(1);
+                if (org.lwjgl.vulkan.VK10.vkAllocateMemory(device, allocInfo, null, pMemory) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
+                    throw new RuntimeException("Failed to allocate image memory");
+                }
+                this.memoryId = pMemory.get(0);
+
+                org.lwjgl.vulkan.VK10.vkBindImageMemory(device, this.id, this.memoryId, 0);
+            }
+        }
         return this;
     }
 
@@ -57,7 +98,11 @@ public class VkTexture extends TrackedObject {
         COUNT--;
         this.hasAllocated = false;
         super.free0();
-        // Placeholder for vkDestroyImage
+        if (!VoxyVulkanContext.MOCK_VULKAN) {
+            org.lwjgl.vulkan.VkDevice device = VoxyVulkanContext.getInstance().getDevice();
+            org.lwjgl.vulkan.VK10.vkDestroyImage(device, this.id, null);
+            org.lwjgl.vulkan.VK10.vkFreeMemory(device, this.memoryId, null);
+        }
     }
 
     public VkTexture name(String name) {

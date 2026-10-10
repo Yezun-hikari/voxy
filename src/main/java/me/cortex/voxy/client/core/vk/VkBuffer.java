@@ -7,6 +7,7 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class VkBuffer extends TrackedObject {
     public final long id;
+    public long memoryId; // Store memory allocation id
     private final long size;
     private final int flags;
 
@@ -37,8 +38,41 @@ public class VkBuffer extends TrackedObject {
         this.flags = flags;
         this.size = size;
 
-        // Placeholder for real Vulkan buffer creation via VMA or vkCreateBuffer
-        this.id = MemoryUtil.memAddress(MemoryUtil.memAlloc(1));
+        if (VoxyVulkanContext.MOCK_VULKAN) {
+            this.id = MemoryUtil.memAddress(MemoryUtil.memAlloc(1));
+        } else {
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                org.lwjgl.vulkan.VkDevice device = VoxyVulkanContext.getInstance().getDevice();
+
+                org.lwjgl.vulkan.VkBufferCreateInfo bufferInfo = org.lwjgl.vulkan.VkBufferCreateInfo.calloc(stack)
+                    .sType(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO)
+                    .size(size)
+                    .usage(flags)
+                    .sharingMode(VK_SHARING_MODE_EXCLUSIVE);
+
+                java.nio.LongBuffer pBuffer = stack.mallocLong(1);
+                if (vkCreateBuffer(device, bufferInfo, null, pBuffer) != VK_SUCCESS) {
+                    throw new RuntimeException("Failed to create buffer");
+                }
+                this.id = pBuffer.get(0);
+
+                org.lwjgl.vulkan.VkMemoryRequirements memRequirements = org.lwjgl.vulkan.VkMemoryRequirements.calloc(stack);
+                vkGetBufferMemoryRequirements(device, this.id, memRequirements);
+
+                org.lwjgl.vulkan.VkMemoryAllocateInfo allocInfo = org.lwjgl.vulkan.VkMemoryAllocateInfo.calloc(stack)
+                    .sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
+                    .allocationSize(memRequirements.size())
+                    .memoryTypeIndex(0); // Placeholder for proper memory type lookup
+
+                java.nio.LongBuffer pMemory = stack.mallocLong(1);
+                if (vkAllocateMemory(device, allocInfo, null, pMemory) != VK_SUCCESS) {
+                    throw new RuntimeException("Failed to allocate buffer memory");
+                }
+                this.memoryId = pMemory.get(0);
+
+                vkBindBufferMemory(device, this.id, this.memoryId, 0);
+            }
+        }
 
         if ((flags & 0x01 /* VK_BUFFER_CREATE_SPARSE_BINDING_BIT */) == 0 && zero) {
             this.zero();
@@ -51,8 +85,13 @@ public class VkBuffer extends TrackedObject {
     @Override
     public void free() {
         this.free0();
-        // Placeholder for real Vulkan buffer deletion
-        MemoryUtil.memFree(MemoryUtil.memByteBuffer(this.id, 1));
+        if (VoxyVulkanContext.MOCK_VULKAN) {
+            MemoryUtil.memFree(MemoryUtil.memByteBuffer(this.id, 1));
+        } else {
+            org.lwjgl.vulkan.VkDevice device = VoxyVulkanContext.getInstance().getDevice();
+            vkDestroyBuffer(device, this.id, null);
+            vkFreeMemory(device, this.memoryId, null);
+        }
 
         COUNT--;
         TOTAL_SIZE -= this.size;

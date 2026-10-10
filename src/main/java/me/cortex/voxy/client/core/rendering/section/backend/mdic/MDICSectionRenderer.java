@@ -194,13 +194,31 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         // this.bindRenderingBuffers(viewport);
 
         // VK Pipeline Barrier Placeholder
+        if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN && viewport.commandBuffer != null) {
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                org.lwjgl.vulkan.VkMemoryBarrier.Buffer barrier = org.lwjgl.vulkan.VkMemoryBarrier.calloc(1, stack)
+                    .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_MEMORY_BARRIER)
+                    .srcAccessMask(org.lwjgl.vulkan.VK10.VK_ACCESS_SHADER_WRITE_BIT)
+                    .dstAccessMask(org.lwjgl.vulkan.VK10.VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
+
+                org.lwjgl.vulkan.VK10.vkCmdPipelineBarrier(viewport.commandBuffer,
+                    org.lwjgl.vulkan.VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    org.lwjgl.vulkan.VK10.VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+                    0, barrier, null, null);
+            }
+        }
 
         if (VoxyClient.getOcclusionDebugState()==3) {
             // vkCmdSetPolygonModeEXT(cmd, VK_POLYGON_MODE_LINE)
         }
 
         if (viewport.commandBuffer != null) {
-            org.lwjgl.vulkan.VK10.vkCmdDrawIndexed(viewport.commandBuffer, maxDrawCount, 1, 0, 0, 0); // Placeholder arguments
+            if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN) {
+                // Vulkan 1.2+ vkCmdDrawIndexedIndirectCount
+                // org.lwjgl.vulkan.VK12.vkCmdDrawIndexedIndirectCount(viewport.commandBuffer, viewport.drawCallBuffer.id, indirectOffset, viewport.drawCountCallBuffer.id, drawCountOffset, maxDrawCount, 5 * 4);
+            }
+            // For mock:
+            // org.lwjgl.vulkan.VK10.vkCmdDrawIndexed(viewport.commandBuffer, maxDrawCount, 1, 0, 0, 0); // Placeholder arguments
         }
 
         if (VoxyClient.getOcclusionDebugState()==3) {
@@ -263,12 +281,45 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         {//Dispatch prep
             this.prepShader.bind();
             // VK Descriptor Binding Placeholder
+            if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN) {
+                // Example descriptor set setup placeholder for Compute SSBOs
+                // VkDescriptorSetLayout layout = createDescriptorSetLayout();
+                // VkDescriptorSet descriptorSet = allocateDescriptorSet(layout);
+                // updateDescriptorSet(descriptorSet, viewport.visibilityBuffer, viewport.indirectLookupBuffer, etc.);
+                // org.lwjgl.vulkan.VK10.vkCmdBindDescriptorSets(viewport.commandBuffer, org.lwjgl.vulkan.VK10.VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, stack.pointers(descriptorSet), null);
+            }
 
             // VK Pipeline Barrier Placeholder
+            if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN && viewport.commandBuffer != null) {
+                try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                    org.lwjgl.vulkan.VkMemoryBarrier.Buffer barrier = org.lwjgl.vulkan.VkMemoryBarrier.calloc(1, stack)
+                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_MEMORY_BARRIER)
+                        .srcAccessMask(org.lwjgl.vulkan.VK10.VK_ACCESS_SHADER_WRITE_BIT)
+                        .dstAccessMask(org.lwjgl.vulkan.VK10.VK_ACCESS_SHADER_READ_BIT);
+                    org.lwjgl.vulkan.VK10.vkCmdPipelineBarrier(viewport.commandBuffer,
+                        org.lwjgl.vulkan.VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        org.lwjgl.vulkan.VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        0, barrier, null, null);
+                }
+            }
             if (viewport.commandBuffer != null) {
-                org.lwjgl.vulkan.VK10.vkCmdDispatch(viewport.commandBuffer, 1, 1, 1);
+                if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN) {
+                    org.lwjgl.vulkan.VK10.vkCmdDispatch(viewport.commandBuffer, 1, 1, 1);
+                }
             }
             // VK Pipeline Barrier Placeholder
+            if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN && viewport.commandBuffer != null) {
+                try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                    org.lwjgl.vulkan.VkMemoryBarrier.Buffer barrier = org.lwjgl.vulkan.VkMemoryBarrier.calloc(1, stack)
+                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_MEMORY_BARRIER)
+                        .srcAccessMask(org.lwjgl.vulkan.VK10.VK_ACCESS_SHADER_WRITE_BIT)
+                        .dstAccessMask(org.lwjgl.vulkan.VK10.VK_ACCESS_SHADER_READ_BIT);
+                    org.lwjgl.vulkan.VK10.vkCmdPipelineBarrier(viewport.commandBuffer,
+                        org.lwjgl.vulkan.VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        org.lwjgl.vulkan.VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        0, barrier, null, null);
+                }
+            }
         }
 
         GPUTiming.INSTANCE.marker("OT");
