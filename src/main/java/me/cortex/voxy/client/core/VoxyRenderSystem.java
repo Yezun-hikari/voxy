@@ -258,6 +258,18 @@ public class VoxyRenderSystem {
         GPUTiming.INSTANCE.marker();//Start marker
         TimingStatistics.main.start();
 
+        if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN && viewport instanceof me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport) {
+            me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport vkVp = (me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport) viewport;
+            if (vkVp.commandBuffer != null) {
+                try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                    org.lwjgl.vulkan.VkCommandBufferBeginInfo beginInfo = org.lwjgl.vulkan.VkCommandBufferBeginInfo.calloc(stack)
+                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
+                        .flags(org.lwjgl.vulkan.VK10.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+                    org.lwjgl.vulkan.VK10.vkBeginCommandBuffer(vkVp.commandBuffer, beginInfo);
+                }
+            }
+        }
+
         //TODO: optimize
         // VK Dynamic Rendering Placeholder
         if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN) {
@@ -317,6 +329,13 @@ public class VoxyRenderSystem {
         GPUTiming.INSTANCE.marker();
         //The entire rendering pipeline (excluding the chunkbound thing)
         this.pipeline.runPipeline(viewport, sourceDepthTexture, sourceColourTexture, scrWidth, scrHeight);
+
+        if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN && viewport instanceof me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport) {
+            me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport vkVp = (me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport) viewport;
+            if (vkVp.commandBuffer != null) {
+                org.lwjgl.vulkan.VK10.vkEndCommandBuffer(vkVp.commandBuffer);
+            }
+        }
         GPUTiming.INSTANCE.marker();
 
 

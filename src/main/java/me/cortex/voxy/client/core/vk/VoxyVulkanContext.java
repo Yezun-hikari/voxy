@@ -54,6 +54,23 @@ public class VoxyVulkanContext {
         return commandPool;
     }
 
+
+    public int findMemoryType(int typeFilter, int properties) {
+        if (MOCK_VULKAN) {
+            return 0;
+        }
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties memProperties = org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties.calloc(stack);
+            org.lwjgl.vulkan.VK10.vkGetPhysicalDeviceMemoryProperties(physicalDevice, memProperties);
+            for (int i = 0; i < memProperties.memoryTypeCount(); i++) {
+                if ((typeFilter & (1 << i)) != 0 && (memProperties.memoryTypes(i).propertyFlags() & properties) == properties) {
+                    return i;
+                }
+            }
+            throw new RuntimeException("Failed to find suitable memory type!");
+        }
+    }
+
     public void cleanup() {
         if (MOCK_VULKAN) {
             return;

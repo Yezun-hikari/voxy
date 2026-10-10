@@ -71,7 +71,7 @@ public class VkTexture extends TrackedObject {
                 org.lwjgl.vulkan.VkMemoryAllocateInfo allocInfo = org.lwjgl.vulkan.VkMemoryAllocateInfo.calloc(stack)
                     .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
                     .allocationSize(memRequirements.size())
-                    .memoryTypeIndex(0); // Placeholder for proper memory type lookup
+                    .memoryTypeIndex(VoxyVulkanContext.getInstance().findMemoryType(memRequirements.memoryTypeBits(), org.lwjgl.vulkan.VK10.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
                 java.nio.LongBuffer pMemory = stack.mallocLong(1);
                 if (org.lwjgl.vulkan.VK10.vkAllocateMemory(device, allocInfo, null, pMemory) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {

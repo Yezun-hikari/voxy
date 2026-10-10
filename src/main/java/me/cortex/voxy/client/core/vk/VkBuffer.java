@@ -62,7 +62,7 @@ public class VkBuffer extends TrackedObject {
                 org.lwjgl.vulkan.VkMemoryAllocateInfo allocInfo = org.lwjgl.vulkan.VkMemoryAllocateInfo.calloc(stack)
                     .sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
                     .allocationSize(memRequirements.size())
-                    .memoryTypeIndex(0); // Placeholder for proper memory type lookup
+                    .memoryTypeIndex(VoxyVulkanContext.getInstance().findMemoryType(memRequirements.memoryTypeBits(), VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
                 java.nio.LongBuffer pMemory = stack.mallocLong(1);
                 if (vkAllocateMemory(device, allocInfo, null, pMemory) != VK_SUCCESS) {
