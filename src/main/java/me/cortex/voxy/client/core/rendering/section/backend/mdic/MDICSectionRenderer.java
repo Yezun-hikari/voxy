@@ -101,6 +101,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private long descriptorSetLayout = 0;
     private long descriptorPool = 0;
     private long descriptorSet = 0;
+    private long pipelineLayout = 0;
+
+    // VK Compute Pipeline handles (prepared for future migration)
+    private long prepComputePipeline = 0;
+    private long commandGenComputePipeline = 0;
 
     public MDICSectionRenderer(AbstractRenderPipeline pipeline, ModelStore modelStore, BasicSectionGeometryData geometryData) {
         super(pipeline.properties, modelStore, geometryData);
@@ -166,6 +171,17 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                         throw new RuntimeException("Failed to allocate descriptor set");
                     }
                     this.descriptorSet = pDescriptorSet.get(0);
+
+                    // Pipeline Layout
+                    org.lwjgl.vulkan.VkPipelineLayoutCreateInfo pipelineLayoutInfo = org.lwjgl.vulkan.VkPipelineLayoutCreateInfo.calloc(stack)
+                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
+                        .pSetLayouts(stack.longs(this.descriptorSetLayout));
+
+                    java.nio.LongBuffer pPipelineLayout = stack.mallocLong(1);
+                    if (org.lwjgl.vulkan.VK10.vkCreatePipelineLayout(device, pipelineLayoutInfo, null, pPipelineLayout) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
+                        throw new RuntimeException("Failed to create pipeline layout");
+                    }
+                    this.pipelineLayout = pPipelineLayout.get(0);
                 }
             }
         }
@@ -401,11 +417,8 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
                     org.lwjgl.vulkan.VK10.vkUpdateDescriptorSets(device, descriptorWrites, null);
 
-                    // Placeholder pipeline layout (should be retrieved properly in real engine)
-                    long pipelineLayout = 1; // dummy placeholder
-
                     // Bind Descriptor Sets
-                    org.lwjgl.vulkan.VK10.vkCmdBindDescriptorSets(viewport.commandBuffer, org.lwjgl.vulkan.VK10.VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, stack.pointers(descriptorSet), null);
+                    org.lwjgl.vulkan.VK10.vkCmdBindDescriptorSets(viewport.commandBuffer, org.lwjgl.vulkan.VK10.VK_PIPELINE_BIND_POINT_COMPUTE, this.pipelineLayout, 0, stack.pointers(descriptorSet), null);
 
                 }
             }
@@ -556,6 +569,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN) {
             org.lwjgl.vulkan.VkDevice device = me.cortex.voxy.client.core.vk.VoxyVulkanContext.getInstance().getDevice();
             if (device != null) {
+                if (this.pipelineLayout != 0) {
+                    org.lwjgl.vulkan.VK10.vkDestroyPipelineLayout(device, this.pipelineLayout, null);
+                    this.pipelineLayout = 0;
+                }
                 if (this.descriptorPool != 0) {
                     org.lwjgl.vulkan.VK10.vkDestroyDescriptorPool(device, this.descriptorPool, null);
                     this.descriptorPool = 0;
