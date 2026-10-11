@@ -71,6 +71,53 @@ public class VoxyVulkanContext {
         }
     }
 
+    public long createComputePipeline(byte[] spirvCode) {
+        if (MOCK_VULKAN) {
+            return 1L; // Dummy handle
+        }
+
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            // 1. Create Shader Module
+            java.nio.ByteBuffer pCode = stack.malloc(spirvCode.length);
+            pCode.put(spirvCode).flip();
+
+            org.lwjgl.vulkan.VkShaderModuleCreateInfo createInfo = org.lwjgl.vulkan.VkShaderModuleCreateInfo.calloc(stack)
+                .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO)
+                .pCode(pCode);
+
+            java.nio.LongBuffer pShaderModule = stack.mallocLong(1);
+            if (org.lwjgl.vulkan.VK10.vkCreateShaderModule(device, createInfo, null, pShaderModule) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
+                throw new RuntimeException("Failed to create shader module");
+            }
+            long shaderModule = pShaderModule.get(0);
+
+            // 2. Create Compute Pipeline
+            org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo shaderStageInfo = org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo.calloc(stack)
+                .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO)
+                .stage(org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_COMPUTE_BIT)
+                .module(shaderModule)
+                .pName(stack.UTF8("main"));
+
+            // Note: Needs a valid pipeline layout. Using a dummy 0 for now as layout creation is missing.
+            org.lwjgl.vulkan.VkComputePipelineCreateInfo.Buffer pipelineInfo = org.lwjgl.vulkan.VkComputePipelineCreateInfo.calloc(1, stack)
+                .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO)
+                .stage(shaderStageInfo)
+                .layout(0); // This needs to be replaced with a real layout later
+
+            java.nio.LongBuffer pPipeline = stack.mallocLong(1);
+            if (org.lwjgl.vulkan.VK10.vkCreateComputePipelines(device, 0, pipelineInfo, null, pPipeline) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
+                // Destroy module if pipeline fails
+                org.lwjgl.vulkan.VK10.vkDestroyShaderModule(device, shaderModule, null);
+                throw new RuntimeException("Failed to create compute pipeline");
+            }
+
+            // Cleanup shader module as it's no longer needed after pipeline creation
+            org.lwjgl.vulkan.VK10.vkDestroyShaderModule(device, shaderModule, null);
+
+            return pPipeline.get(0);
+        }
+    }
+
     public void cleanup() {
         if (MOCK_VULKAN) {
             return;

@@ -271,24 +271,26 @@ public class VoxyRenderSystem {
         }
 
         //TODO: optimize
-        // VK Dynamic Rendering Placeholder
-        if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN) {
-            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
-                org.lwjgl.vulkan.VkRenderingAttachmentInfo colorAttachment = org.lwjgl.vulkan.VkRenderingAttachmentInfo.calloc(stack)
-                    .sType(org.lwjgl.vulkan.VK13.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO)
-                    .imageView(1) // Placeholder view
-                    .imageLayout(org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-                    .loadOp(org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_LOAD)
-                    .storeOp(org.lwjgl.vulkan.VK10.VK_ATTACHMENT_STORE_OP_STORE);
+        // VK Dynamic Rendering
+        if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN && viewport instanceof me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport) {
+            me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport vkVp = (me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport) viewport;
+            if (vkVp.commandBuffer != null) {
+                try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                    org.lwjgl.vulkan.VkRenderingAttachmentInfo colorAttachment = org.lwjgl.vulkan.VkRenderingAttachmentInfo.calloc(stack)
+                        .sType(org.lwjgl.vulkan.VK13.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO)
+                        .imageView(1) // Placeholder view
+                        .imageLayout(org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                        .loadOp(org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_LOAD)
+                        .storeOp(org.lwjgl.vulkan.VK10.VK_ATTACHMENT_STORE_OP_STORE);
 
-                org.lwjgl.vulkan.VkRenderingInfo renderingInfo = org.lwjgl.vulkan.VkRenderingInfo.calloc(stack)
-                    .sType(org.lwjgl.vulkan.VK13.VK_STRUCTURE_TYPE_RENDERING_INFO)
-                    .renderArea(it -> it.offset(o -> o.x(0).y(0)).extent(e -> e.width(viewport.width).height(viewport.height)))
-                    .layerCount(1)
-                    .colorAttachments(org.lwjgl.vulkan.VkRenderingAttachmentInfo.calloc(1, stack).put(0, colorAttachment));
+                    org.lwjgl.vulkan.VkRenderingInfo renderingInfo = org.lwjgl.vulkan.VkRenderingInfo.calloc(stack)
+                        .sType(org.lwjgl.vulkan.VK13.VK_STRUCTURE_TYPE_RENDERING_INFO)
+                        .renderArea(it -> it.offset(o -> o.x(0).y(0)).extent(e -> e.width(viewport.width).height(viewport.height)))
+                        .layerCount(1)
+                        .colorAttachments(org.lwjgl.vulkan.VkRenderingAttachmentInfo.calloc(1, stack).put(0, colorAttachment));
 
-                // viewport.commandBuffer should be used here
-                // org.lwjgl.vulkan.VK13.vkCmdBeginRendering(viewport.commandBuffer, renderingInfo);
+                    org.lwjgl.vulkan.VK13.vkCmdBeginRendering(vkVp.commandBuffer, renderingInfo);
+                }
             }
         }
 
@@ -333,6 +335,7 @@ public class VoxyRenderSystem {
         if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN && viewport instanceof me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport) {
             me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport vkVp = (me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport) viewport;
             if (vkVp.commandBuffer != null) {
+                org.lwjgl.vulkan.VK13.vkCmdEndRendering(vkVp.commandBuffer);
                 org.lwjgl.vulkan.VK10.vkEndCommandBuffer(vkVp.commandBuffer);
             }
         }

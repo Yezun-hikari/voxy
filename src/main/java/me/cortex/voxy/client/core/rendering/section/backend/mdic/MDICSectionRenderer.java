@@ -94,10 +94,82 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     //Statistics
     private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();
 
+
     private final AbstractRenderPipeline pipeline;
+
+    // VK Descriptor handles
+    private long descriptorSetLayout = 0;
+    private long descriptorPool = 0;
+    private long descriptorSet = 0;
+
     public MDICSectionRenderer(AbstractRenderPipeline pipeline, ModelStore modelStore, BasicSectionGeometryData geometryData) {
         super(pipeline.properties, modelStore, geometryData);
         this.pipeline = pipeline;
+
+        // Initialize VK Descriptor Layout and Pool if not mocking
+        if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN) {
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                org.lwjgl.vulkan.VkDevice device = me.cortex.voxy.client.core.vk.VoxyVulkanContext.getInstance().getDevice();
+                if (device != null) {
+                    // Descriptor Set Layout Binding for SSBOs and Uniform Buffer
+                    org.lwjgl.vulkan.VkDescriptorSetLayoutBinding.Buffer bindings = org.lwjgl.vulkan.VkDescriptorSetLayoutBinding.calloc(3, stack);
+                    bindings.get(0)
+                        .binding(0)
+                        .descriptorType(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+                        .descriptorCount(1)
+                        .stageFlags(org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_COMPUTE_BIT);
+                    bindings.get(1)
+                        .binding(1)
+                        .descriptorType(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+                        .descriptorCount(1)
+                        .stageFlags(org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_COMPUTE_BIT);
+                    bindings.get(2)
+                        .binding(2)
+                        .descriptorType(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+                        .descriptorCount(1)
+                        .stageFlags(org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_COMPUTE_BIT);
+
+                    org.lwjgl.vulkan.VkDescriptorSetLayoutCreateInfo layoutInfo = org.lwjgl.vulkan.VkDescriptorSetLayoutCreateInfo.calloc(stack)
+                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
+                        .pBindings(bindings);
+
+                    java.nio.LongBuffer pDescriptorSetLayout = stack.mallocLong(1);
+                    if (org.lwjgl.vulkan.VK10.vkCreateDescriptorSetLayout(device, layoutInfo, null, pDescriptorSetLayout) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
+                        throw new RuntimeException("Failed to create descriptor set layout");
+                    }
+                    this.descriptorSetLayout = pDescriptorSetLayout.get(0);
+
+                    // Descriptor Pool
+                    org.lwjgl.vulkan.VkDescriptorPoolSize.Buffer poolSizes = org.lwjgl.vulkan.VkDescriptorPoolSize.calloc(2, stack);
+                    poolSizes.get(0).type(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER).descriptorCount(1);
+                    poolSizes.get(1).type(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER).descriptorCount(2);
+
+                    org.lwjgl.vulkan.VkDescriptorPoolCreateInfo poolInfo = org.lwjgl.vulkan.VkDescriptorPoolCreateInfo.calloc(stack)
+                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO)
+                        .pPoolSizes(poolSizes)
+                        .maxSets(1);
+
+                    java.nio.LongBuffer pDescriptorPool = stack.mallocLong(1);
+                    if (org.lwjgl.vulkan.VK10.vkCreateDescriptorPool(device, poolInfo, null, pDescriptorPool) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
+                        throw new RuntimeException("Failed to create descriptor pool");
+                    }
+                    this.descriptorPool = pDescriptorPool.get(0);
+
+                    // Allocate Descriptor Sets
+                    org.lwjgl.vulkan.VkDescriptorSetAllocateInfo allocInfo = org.lwjgl.vulkan.VkDescriptorSetAllocateInfo.calloc(stack)
+                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO)
+                        .descriptorPool(this.descriptorPool)
+                        .pSetLayouts(stack.longs(this.descriptorSetLayout));
+
+                    java.nio.LongBuffer pDescriptorSet = stack.mallocLong(1);
+                    if (org.lwjgl.vulkan.VK10.vkAllocateDescriptorSets(device, allocInfo, pDescriptorSet) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
+                        throw new RuntimeException("Failed to allocate descriptor set");
+                    }
+                    this.descriptorSet = pDescriptorSet.get(0);
+                }
+            }
+        }
+
         //The pipeline can be used to transform the renderer in abstract ways
 
         String vertex = ShaderLoader.parse("voxy:lod/gl46/quads3.vert");
@@ -281,65 +353,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         {//Dispatch prep
             this.prepShader.bind();
             // VK Descriptor Binding Placeholder
-            if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN && viewport.commandBuffer != null) {
+            if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN && viewport.commandBuffer != null && this.descriptorSet != 0) {
                 try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
                     org.lwjgl.vulkan.VkDevice device = me.cortex.voxy.client.core.vk.VoxyVulkanContext.getInstance().getDevice();
-
-                    // Descriptor Set Layout Binding for SSBOs and Uniform Buffer
-                    org.lwjgl.vulkan.VkDescriptorSetLayoutBinding.Buffer bindings = org.lwjgl.vulkan.VkDescriptorSetLayoutBinding.calloc(3, stack);
-                    bindings.get(0)
-                        .binding(0)
-                        .descriptorType(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-                        .descriptorCount(1)
-                        .stageFlags(org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_COMPUTE_BIT);
-                    bindings.get(1)
-                        .binding(1)
-                        .descriptorType(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
-                        .descriptorCount(1)
-                        .stageFlags(org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_COMPUTE_BIT);
-                    bindings.get(2)
-                        .binding(2)
-                        .descriptorType(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
-                        .descriptorCount(1)
-                        .stageFlags(org.lwjgl.vulkan.VK10.VK_SHADER_STAGE_COMPUTE_BIT);
-
-                    org.lwjgl.vulkan.VkDescriptorSetLayoutCreateInfo layoutInfo = org.lwjgl.vulkan.VkDescriptorSetLayoutCreateInfo.calloc(stack)
-                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
-                        .pBindings(bindings);
-
-                    java.nio.LongBuffer pDescriptorSetLayout = stack.mallocLong(1);
-                    if (org.lwjgl.vulkan.VK10.vkCreateDescriptorSetLayout(device, layoutInfo, null, pDescriptorSetLayout) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
-                        throw new RuntimeException("Failed to create descriptor set layout");
-                    }
-                    long descriptorSetLayout = pDescriptorSetLayout.get(0);
-
-                    // Descriptor Pool
-                    org.lwjgl.vulkan.VkDescriptorPoolSize.Buffer poolSizes = org.lwjgl.vulkan.VkDescriptorPoolSize.calloc(2, stack);
-                    poolSizes.get(0).type(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER).descriptorCount(1);
-                    poolSizes.get(1).type(org.lwjgl.vulkan.VK10.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER).descriptorCount(2);
-
-                    org.lwjgl.vulkan.VkDescriptorPoolCreateInfo poolInfo = org.lwjgl.vulkan.VkDescriptorPoolCreateInfo.calloc(stack)
-                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO)
-                        .pPoolSizes(poolSizes)
-                        .maxSets(1);
-
-                    java.nio.LongBuffer pDescriptorPool = stack.mallocLong(1);
-                    if (org.lwjgl.vulkan.VK10.vkCreateDescriptorPool(device, poolInfo, null, pDescriptorPool) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
-                        throw new RuntimeException("Failed to create descriptor pool");
-                    }
-                    long descriptorPool = pDescriptorPool.get(0);
-
-                    // Allocate Descriptor Sets
-                    org.lwjgl.vulkan.VkDescriptorSetAllocateInfo allocInfo = org.lwjgl.vulkan.VkDescriptorSetAllocateInfo.calloc(stack)
-                        .sType(org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO)
-                        .descriptorPool(descriptorPool)
-                        .pSetLayouts(pDescriptorSetLayout);
-
-                    java.nio.LongBuffer pDescriptorSet = stack.mallocLong(1);
-                    if (org.lwjgl.vulkan.VK10.vkAllocateDescriptorSets(device, allocInfo, pDescriptorSet) != org.lwjgl.vulkan.VK10.VK_SUCCESS) {
-                        throw new RuntimeException("Failed to allocate descriptor sets");
-                    }
-                    long descriptorSet = pDescriptorSet.get(0);
+                    long descriptorSet = this.descriptorSet;
 
                     // Update Descriptor Sets
                     org.lwjgl.vulkan.VkDescriptorBufferInfo.Buffer uniformBufferInfo = org.lwjgl.vulkan.VkDescriptorBufferInfo.calloc(1, stack)
@@ -390,19 +407,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                     // Bind Descriptor Sets
                     org.lwjgl.vulkan.VK10.vkCmdBindDescriptorSets(viewport.commandBuffer, org.lwjgl.vulkan.VK10.VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, stack.pointers(descriptorSet), null);
 
-                    // Note: This logic allocates descriptor layouts/pools dynamically here which will leak memory
-                    // on every invocation. In a full implementation, these must be cached / initialized once
-                    // and destroyed properly. For now we will destroy them immediately after use for the sake of
-                    // avoiding a leak until properly abstracted into a descriptor manager.
-
-                    // Actually, normally we wouldn't destroy them before dispatch, but they need to be alive for the dispatch.
-                    // We will just leave a placeholder for destruction or manage it gracefully. Since it's a mock, it's fine.
-                    // To prevent actual leaks in non-mock, we will destroy the layout and pool after dispatch.
-                    // Wait, we can't destroy them before dispatch executes. We will just add cleanup placeholders.
-
-                    // Cleanup placeholders (this logic should ideally move to a dedicated manager or be destroyed at end of frame)
-                    // org.lwjgl.vulkan.VK10.vkDestroyDescriptorPool(device, descriptorPool, null);
-                    // org.lwjgl.vulkan.VK10.vkDestroyDescriptorSetLayout(device, descriptorSetLayout, null);
                 }
             }
 
@@ -549,6 +553,20 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     @Override
     public void free() {
+        if (!me.cortex.voxy.client.core.vk.VoxyVulkanContext.MOCK_VULKAN) {
+            org.lwjgl.vulkan.VkDevice device = me.cortex.voxy.client.core.vk.VoxyVulkanContext.getInstance().getDevice();
+            if (device != null) {
+                if (this.descriptorPool != 0) {
+                    org.lwjgl.vulkan.VK10.vkDestroyDescriptorPool(device, this.descriptorPool, null);
+                    this.descriptorPool = 0;
+                }
+                if (this.descriptorSetLayout != 0) {
+                    org.lwjgl.vulkan.VK10.vkDestroyDescriptorSetLayout(device, this.descriptorSetLayout, null);
+                    this.descriptorSetLayout = 0;
+                }
+            }
+        }
+
         this.uniform.free();
         this.distanceCountBuffer.free();
         this.translucentTerrainShader.free();
